@@ -290,7 +290,7 @@ export default function DashboardPage() {
     // Verificação do MiniKit antes de prosseguir
     try {
       if (!MiniKit.isInstalled()) {
-        toast.error('❌ MiniKit não está instalado no World App', {
+        toast.error("❌ MiniKit não está instalado no World App", {
           position: "top-center",
           autoClose: 5000,
           theme: "colored"
@@ -298,7 +298,7 @@ export default function DashboardPage() {
         return;
       }
 
-      toast.success('✅ MiniKit reconhecido! Preparando transação...', {
+      toast.success("✅ MiniKit reconhecido! Preparando transação...", {
         position: "top-center",
         autoClose: 3000,
         theme: "colored"
@@ -311,7 +311,7 @@ export default function DashboardPage() {
       setTradeAmount("");
 
     } catch (error: any) {
-      toast.error(`⚠️ Erro ao verificar MiniKit: ${error.message}`, {
+      toast.error('⚠️ Erro ao verificar MiniKit: ${error.message}', {
         position: "top-center",
         autoClose: 5000,
         theme: "colored"
