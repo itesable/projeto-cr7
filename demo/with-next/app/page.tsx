@@ -56,7 +56,7 @@ export default function CR7WhitepaperApp() {
       icon: <Target className="w-5 h-5" />,
       content: (
         <p className="text-gray-700 leading-relaxed">
-          To build one of the strongest and most committed holder communities in the crypto world — where every investor is a `"`financial athlete`"` training daily to achieve extraordinary results.
+          To build one of the strongest and most committed holder communities in the crypto world — where every investor is a financial athlete training daily to achieve extraordinary results.
         </p>
       ),
     },
@@ -97,7 +97,7 @@ export default function CR7WhitepaperApp() {
               <li>• Trading section on miniapp</li>
               <li>• Token locking system development</li>
               <li>• Staking system with progressive APY</li>
-              <li>• Bounty Program based on CR7`'`s achievements</li>
+              <li>• Bounty Program based on CR7 achievements</li>
               <li>• Official merchandise store</li>
               <li>• Collectible card album release</li>
             </ul>
@@ -514,8 +514,7 @@ export default function CR7WhitepaperApp() {
             </div>
             <h2 className="text-xl font-bold mb-3">Conclusion</h2>
             <p className="text-sm leading-relaxed opacity-95">
-              The $CR7 Token is not about quick wins or small profits — it`'`s a solid and well-structured project, based
-              on the principles of consistency, ambition, and the spirit of a legendary athlete.
+              The $CR7 Token is not about quick wins or small profits — its a solid and well-structured project, based on the principles of consistency, ambition, and the spirit of a legendary athlete.
             </p>
             <p className="font-bold mt-3 text-lg drop-shadow-md">Here, only those who think big will win big.</p>
           </CardContent>
