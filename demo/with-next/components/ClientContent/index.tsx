@@ -10,7 +10,7 @@ import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { WalletAuth } from './WalletAuth';
 //import { TokenSwap } from './TokenSwap';
-import { SendTransaction } from './Transaction';
+//import { SendTransaction } from './Transaction';
 
 
 const VersionsNoSSR = dynamic(
