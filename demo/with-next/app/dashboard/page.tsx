@@ -311,7 +311,7 @@ export default function DashboardPage() {
       setTradeAmount("");
 
     } catch (error: any) {
-      toast.error(`⚠️ Erro ao verificar MiniKit: ${error.message}, {
+      toast.error(`⚠️ Erro ao verificar MiniKit: ${error.message}`, {
         position: "top-center",
         autoClose: 5000,
         theme: "colored"
