@@ -108,7 +108,7 @@ export default function DashboardPage() {
       if (userData) {
         setUserAddress(userData.address);
       } else {
-        toast.warning(Endereço não encontrado para este username);
+        toast.warning(`Endereço não encontrado para este username);
       }
     } catch (error) {
       console.error("Erro ao buscar endereço do usuário:", error);
