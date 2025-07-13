@@ -515,7 +515,7 @@ export default function CR7WhitepaperApp() {
             </div>
             <h2 className="text-xl font-bold mb-3">Conclusion</h2>
             <p className="text-sm leading-relaxed opacity-95">
-              The $CR7 Token is not about quick wins or small profits — it`'s a solid and well-structured project, based
+              The $CR7 Token is not about quick wins or small profits — it`'`s a solid and well-structured project, based
               on the principles of consistency, ambition, and the spirit of a legendary athlete.
             </p>
             <p className="font-bold mt-3 text-lg drop-shadow-md">Here, only those who think big will win big.</p>
