@@ -1,0 +1,9 @@
+export type Permit2 = {
+	permitted: {
+		token: string
+		amount: string | unknown
+	}
+	spender: string
+	nonce: string | unknown
+	deadline: string | unknown
+}

@@ -1,0 +1,226 @@
+// lib/db.ts
+import mysql from 'mysql2/promise';
+
+interface ClaimRecord {
+  id: number;
+  username: string;
+  address: string;
+  hasClaimed: number;
+  lastTimeClaimed: Date | null;
+  totalClaimed: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Configuração do banco de dados
+const pool = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  timezone: 'utc' // Importante para evitar problemas com fuso horário
+});
+
+// Testar conexão com o banco de dados
+async function testDatabaseConnection() {
+  try {
+    const connection = await pool.getConnection();
+    console.log('✅ Conexão com o banco de dados estabelecida com sucesso!');
+    connection.release();
+    
+    // Verificar se a tabela existe
+    const [tables]: any = await pool.query(
+      "SHOW TABLES LIKE 'claims'"
+    );
+    
+    if (tables.length === 0) {
+      console.error('⛔ ATENÇÃO: A tabela "claims" não foi encontrada!');
+      await initializeDatabase();
+    } else {
+      console.log('✅ Tabela "claims" encontrada');
+    }
+  } catch (error) {
+    console.error('⛔ Erro ao conectar ao banco de dados:', error);
+    throw new Error('Falha na conexão com o banco de dados');
+  }
+}
+
+// Criar tabela se não existir
+async function initializeDatabase() {
+  const createTableQuery = `
+    CREATE TABLE IF NOT EXISTS claims (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(255) NOT NULL,
+      address VARCHAR(42) UNIQUE NOT NULL,
+      hasClaimed TINYINT DEFAULT 0,
+      lastTimeClaimed DATETIME NULL,
+      totalClaimed INT DEFAULT 0,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `;
+  
+  try {
+    await pool.query(createTableQuery);
+    console.log('✅ Tabela claims criada/verificada com sucesso');
+  } catch (error) {
+    console.error('⛔ Erro ao criar tabela:', error);
+    throw error;
+  }
+}
+
+// Inicializar banco de dados e testar conexão
+testDatabaseConnection()
+  .then(() => initializeDatabase())
+  .catch(err => console.error('⛔ Erro na inicialização do banco:', err));
+
+// Funções de acesso ao banco de dados
+export const db = {
+  async getClaimRecord(address: string): Promise<ClaimRecord | null> {
+    // Validar formato do endereço
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      console.error('⛔ Formato de endereço inválido:', address);
+      return null;
+    }
+    
+    try {
+      console.log(`🔍 Buscando registro para: ${address}`);
+      const [rows]: any = await pool.query(
+        'SELECT * FROM claims WHERE address = ?',
+        [address]
+      );
+      
+      if (rows.length > 0) {
+        console.log('✅ Registro encontrado:', rows[0]);
+        return rows[0];
+      }
+      
+      console.log('ℹ️ Nenhum registro encontrado para', address);
+      return null;
+    } catch (error) {
+      console.error('⛔ Erro ao buscar registro:', error);
+      throw error;
+    }
+  },
+
+  async createOrUpdateClaimRecord(address: string, username: string) {
+    // Validar inputs
+    if (!address || !username) {
+      throw new Error('Endereço e username são obrigatórios');
+    }
+    
+    try {
+      const existingRecord = await this.getClaimRecord(address);
+      
+      if (existingRecord) {
+        console.log('ℹ️ Registro já existe, retornando existente');
+        return existingRecord;
+      }
+      
+      console.log(`➕ Criando novo registro para: ${address} (${username})`);
+      const [result]: any = await pool.query(
+        'INSERT INTO claims (address, username) VALUES (?, ?)',
+        [address, username]
+      );
+      
+      console.log('✅ Novo registro criado, ID:', result.insertId);
+      return await this.getClaimRecord(address);
+    } catch (error) {
+      console.error('⛔ Erro ao criar/atualizar registro:', error);
+      throw error;
+    }
+  },
+
+  async updateClaimStatus(address: string) {
+    try {
+      console.log(`🔄 Atualizando status para: ${address}`);
+      const now = new Date();
+      
+      await pool.query(
+        `UPDATE claims 
+         SET hasClaimed = 1, 
+             lastTimeClaimed = ?, 
+             totalClaimed = totalClaimed + 1 
+         WHERE address = ?`,
+        [now, address]
+      );
+      
+      console.log('✅ Status atualizado com sucesso');
+    } catch (error) {
+      console.error('⛔ Erro ao atualizar status:', error);
+      throw error;
+    }
+  },
+
+  async canUserClaim(address: string): Promise<boolean> {
+    // Validar endereço
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      console.error('⛔ Endereço inválido para verificação:', address);
+      return false;
+    }
+    
+    try {
+      console.log(`❓ Verificando se pode claim: ${address}`);
+      const record = await this.getClaimRecord(address);
+      
+      // Se não há registro, pode fazer claim
+      if (!record) {
+        console.log('✅ Pode claim: nenhum registro encontrado');
+        return true;
+      }
+      
+      // Se nunca fez claim, pode fazer
+      if (record.hasClaimed === 0) {
+        console.log('✅ Pode claim: nunca fez claim antes');
+        return true;
+      }
+      
+      // Se há data do último claim, verificar intervalo
+      if (record.lastTimeClaimed) {
+        // Converter para Date se necessário
+        const lastClaimDate = record.lastTimeClaimed instanceof Date 
+          ? record.lastTimeClaimed 
+          : new Date(record.lastTimeClaimed);
+        
+        // Verificar se a data é válida
+        if (isNaN(lastClaimDate.getTime())) {
+          console.error('⛔ Data inválida:', record.lastTimeClaimed);
+          return true;
+        }
+        
+        const now = new Date();
+        const diffMs = now.getTime() - lastClaimDate.getTime();
+        const diffHours = diffMs / (1000 * 60 * 60);
+        
+        console.log(`⏱️ Último claim: ${lastClaimDate}`);
+        console.log(`⏱️ Agora: ${now}`);
+        console.log(`⏱️ Diferença: ${diffHours.toFixed(2)} horas`);
+        
+        const canClaim = diffHours >= 24;
+        console.log(`ℹ️ Pode claim: ${canClaim}`);
+        return canClaim;
+      }
+      
+      // Caso não tenha data de último claim, permite
+      console.log('✅ Pode claim: sem data de último claim');
+      return true;
+    } catch (error) {
+      console.error('⛔ Erro em canUserClaim:', error);
+      return false;
+    }
+  },
+
+  // Função adicional para depuração
+  async getAllClaims() {
+    try {
+      const [rows]: any = await pool.query('SELECT * FROM claims');
+      return rows;
+    } catch (error) {
+      console.error('⛔ Erro ao buscar todos os registros:', error);
+      return [];
+    }
+  }
+};

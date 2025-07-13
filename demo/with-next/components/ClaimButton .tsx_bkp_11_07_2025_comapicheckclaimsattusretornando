@@ -1,0 +1,338 @@
+// components/ClaimButton.tsx
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { useAccount } from 'wagmi';
+import { toast } from 'react-toastify';
+
+const ClaimButton = () => {
+  const { address, isConnected } = useAccount();
+  const [claimStatus, setClaimStatus] = useState({
+    canClaim: false,
+    lastClaimTime: null as number | null,
+    timeLeft: ''
+  });
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const isMounted = useRef(true);
+  const userAddressRef = useRef<string | null>(null);
+  const profileLoadedRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  // Carregar perfil do usuário
+  useEffect(() => {
+    if (profileLoadedRef.current) return;
+    profileLoadedRef.current = true;
+    
+    console.log("🔔 Iniciando carregamento do perfil");
+    
+    try {
+      const storedProfile = localStorage.getItem('userProfile');
+      if (storedProfile) {
+        const profile = JSON.parse(storedProfile);
+        console.log("📝 Perfil carregado:", profile);
+        
+        // 1. Prioridade para address do perfil
+        if (profile.address) {
+          console.log("✅ Endereço já disponível no perfil:", profile.address);
+          userAddressRef.current = profile.address;
+          setIsLoading(false);
+          checkClaimStatus();
+        } 
+        // 2. Se não tem address mas tem username, buscamos
+        else if (profile.username) {
+          console.log("🔍 Buscando endereço para username:", profile.username);
+          fetchUserAddress(profile.username);
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("❌ Erro ao carregar perfil:", error);
+    }
+    
+    // Se não tem perfil ou não tem username
+    setIsLoading(false);
+  }, []);
+
+  // Buscar endereço associado ao username
+  const fetchUserAddress = async (username: string) => {
+    console.log("🌐 Iniciando busca de endereço para:", username);
+    
+    try {
+      const response = await fetch(
+        `https://usernames.worldcoin.org/api/v1/search/${username}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("🔍 Resultado da busca:", data);
+      
+      const userData = data.find(
+        (user: any) => user.username === username
+      );
+      
+      if (userData) {
+        console.log("✅ Endereço encontrado:", userData.address);
+        userAddressRef.current = userData.address;
+        
+        // Atualizar perfil no localStorage
+        const storedProfile = localStorage.getItem('userProfile');
+        if (storedProfile) {
+          const updatedProfile = JSON.parse(storedProfile);
+          updatedProfile.address = userData.address;
+          localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+        }
+      }
+    } catch (error) {
+      console.error("❌ Erro ao buscar endereço:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Verificar status do claim
+  const checkClaimStatus = async () => {
+    const claimAddress = address || userAddressRef.current;
+    console.log("🔍 Verificando status para:", claimAddress);
+    
+    if (!claimAddress) {
+      console.log("⏭️ Sem endereço - pulando verificação");
+      return;
+    }
+    
+    try {
+      console.log("🌐 Chamando /api/check-claim...");
+      const response = await fetch(
+        `/api/check-claim?address=${encodeURIComponent(claimAddress)}`
+      );
+      
+      console.log("📊 Resposta da API:", response.status);
+      
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("✅ Dados recebidos:", data);
+      
+      if (isMounted.current) {
+        // Atualizar o estado com os dados recebidos
+        setClaimStatus({
+          canClaim: data.canClaim,
+          lastClaimTime: data.lastClaimTime,
+          timeLeft: data.canClaim ? '' : claimStatus.timeLeft
+        });
+        
+        // Se não pode fazer claim e temos lastClaimTime, calcular tempo
+        if (!data.canClaim && data.lastClaimTime) {
+          console.log("⏳ Calculando tempo restante...");
+          calculateTimeLeft(data.lastClaimTime);
+        }
+      }
+    } catch (err) {
+      console.error("❌ Erro ao verificar status:", err);
+    }
+  };
+
+  // Calcular tempo restante
+  const calculateTimeLeft = (lastTime: number) => {
+    if (!isMounted.current) return;
+    
+    const now = Date.now();
+    const nextClaimTime = lastTime + 24 * 60 * 60 * 1000;
+    const difference = nextClaimTime - now;
+    
+    if (difference <= 0) {
+      setClaimStatus(prev => ({
+        ...prev,
+        canClaim: true,
+        timeLeft: ''
+      }));
+      return;
+    }
+    
+    const hours = Math.floor(difference / (1000 * 60 * 60));
+    const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+    
+    const formattedTime = `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
+    
+    setClaimStatus(prev => ({
+      ...prev,
+      timeLeft: formattedTime
+    }));
+  };
+
+  // Atualizar contador em tempo real
+  useEffect(() => {
+    if (!claimStatus.lastClaimTime || claimStatus.canClaim || !isMounted.current) {
+      return;
+    }
+    
+    const timer = setInterval(() => {
+      calculateTimeLeft(claimStatus.lastClaimTime!);
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [claimStatus.lastClaimTime, claimStatus.canClaim]);
+
+  // Verificar status quando os dados estiverem prontos
+  useEffect(() => {
+    if (!isLoading && isMounted.current) {
+      console.log("✅ Condições satisfeitas - verificando status");
+      checkClaimStatus();
+      
+      // Verificar a cada 30 segundos
+      const interval = setInterval(() => {
+        checkClaimStatus();
+      }, 30000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isLoading]);
+
+  // Verificar status quando o endereço da carteira mudar
+  useEffect(() => {
+    if (isMounted.current && address) {
+      console.log("🔄 Endereço da carteira alterado - verificando status");
+      checkClaimStatus();
+    }
+  }, [address]);
+
+  const handleClaim = async () => {
+    const claimAddress = address || userAddressRef.current;
+    console.log("🎯 Iniciando claim para:", claimAddress);
+    
+    if (!claimAddress || isClaiming || !isMounted.current) return;
+    
+    setIsClaiming(true);
+    
+    try {
+      const storedProfile = localStorage.getItem('userProfile');
+      const username = storedProfile 
+        ? JSON.parse(storedProfile).username 
+        : `user_${claimAddress.slice(2, 8)}`;
+      
+      const response = await fetch('/api/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          address: claimAddress, 
+          username 
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao processar');
+      }
+      
+      if (isMounted.current) {
+        // Após claim bem-sucedido, atualizar estado imediatamente
+        setClaimStatus({
+          canClaim: false,
+          lastClaimTime: Date.now(),
+          timeLeft: ''
+        });
+      }
+      toast.success('1 CR7 token successfully claimed!');
+    } catch (err) {
+      console.error('❌ Erro ao fazer claim:', err);
+      toast.error('Falha ao reivindicar token');
+    } finally {
+      if (isMounted.current) {
+        setIsClaiming(false);
+        // Forçar nova verificação após 2 segundos
+        setTimeout(checkClaimStatus, 2000);
+      }
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center">
+        <div className="animate-pulse bg-gray-200 rounded-lg w-32 h-10" />
+      </div>
+    );
+  }
+
+  const isUserConnected = isConnected || userAddressRef.current !== null;
+  
+  if (!isUserConnected) {
+    return null;
+  }
+
+  return (
+    <div className="w-full">
+      {claimStatus.canClaim ? (
+        <button
+          onClick={handleClaim}
+          disabled={isClaiming}
+          className="
+            bg-white
+            text-green-600
+            font-bold
+            py-3
+            px-6
+            rounded-lg
+            border-2
+            border-green-500
+            shadow-sm
+            hover:bg-gray-50
+            transition-colors
+            duration-200
+            disabled:opacity-70 
+            disabled:cursor-not-allowed
+            w-full
+            flex
+            items-center
+            justify-center
+          "
+        >
+          {isClaiming ? (
+            <>
+              <svg className="animate-spin h-5 w-5 mr-2 text-green-600" viewBox="0 0 24 24">
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  fill="none"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              Processando...
+            </>
+          ) : (
+            'CLAIM 1 CR7'
+          )}
+        </button>
+      ) : claimStatus.timeLeft ? (
+        <div className="text-center">
+          <p className="text-white font-medium">Next claim in: {claimStatus.timeLeft}</p>
+        </div>
+      ) : (
+        <div className="text-center">
+          <p className="text-white font-medium">Verifying status...</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ClaimButton;

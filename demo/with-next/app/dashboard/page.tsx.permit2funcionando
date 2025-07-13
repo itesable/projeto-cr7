@@ -1,0 +1,470 @@
+"use client";
+
+import { useState, useEffect } from 'react';
+import { MiniKit, Tokens, tokenToDecimals, SendTransactionInput, Transaction } from '@worldcoin/minikit-js';
+import { useWaitForTransactionReceipt } from '@worldcoin/minikit-react';
+import { createPublicClient, http, Abi, encodeFunctionData } from 'viem';
+import { worldchain } from 'viem/chains';
+import axios from 'axios';
+import { toast } from 'react-hot-toast';
+import { ethers } from 'ethers';
+
+// Endereços dos contratos na World Chain
+const WLD_TOKEN = "0x2cFc85d8E48F8EAB294be644d9E25C3030863003";
+const CR7_TOKEN = "0x3664c2D02e0DAcdBCbB90F839CAeaa7b925142d7";
+const UNISWAP_V2_ROUTER = "0x541aB7c31A119441eF3575F6973277DE0eF460bd";
+const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
+
+// Constantes para taxas de gás
+const WORLDCHAIN_FAUCET_URL = "https://faucet.worldcoin.org";
+const MIN_GAS_BALANCE = ethers.parseEther("0.0001");
+
+// Interface para o perfil do usuário
+interface UserProfile {
+  username: string | null;
+  profilePictureUrl?: string | null;
+  walletAddress?: string;
+}
+
+export default function SwapPage() {
+  const [amount, setAmount] = useState('0.002');
+  const [loading, setLoading] = useState(false);
+  const [transactionId, setTransactionId] = useState('');
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userAddress, setUserAddress] = useState<string | null>(null);
+  
+  // Configuração do cliente Viem para interagir com a World Chain
+  const client = createPublicClient({
+    chain: worldchain,
+    transport: http('https://worldchain-mainnet.g.alchemy.com/public'),
+  });
+
+  // Hook para aguardar a confirmação da transação na blockchain
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+    error: transactionError,
+  } = useWaitForTransactionReceipt({
+    client: client,
+    transactionId: transactionId as `0x${string}` | undefined,
+    pollingInterval: 2000,
+  });
+
+  // Efeito para carregar o perfil do usuário do localStorage ao montar o componente
+  useEffect(() => {
+    const storedProfile = localStorage.getItem('userProfile');
+    if (storedProfile) {
+      const profile = JSON.parse(storedProfile);
+      setUserProfile(profile);
+      
+      if (profile.walletAddress) {
+        setUserAddress(profile.walletAddress);
+      } else if (profile.username) {
+        fetchUserAddress(profile.username);
+      }
+    }
+  }, []);
+
+  // Função para buscar o endereço da carteira associado a um username do World ID
+  const fetchUserAddress = async (username: string) => {
+    try {
+      const response = await axios.get(
+        `https://usernames.worldcoin.org/api/v1/search/${username}`
+      );
+      
+      const userData = response.data.find(
+        (user: any) => user.username === username
+      );
+      
+      if (userData) {
+        setUserAddress(userData.address);
+        // Atualiza o perfil no estado e no localStorage com o endereço encontrado
+        setUserProfile(prev => ({
+          ...prev!,
+          walletAddress: userData.address
+        }));
+        localStorage.setItem('userProfile', JSON.stringify({
+          ...JSON.parse(localStorage.getItem('userProfile') || '{}'),
+          walletAddress: userData.address
+        }));
+      }
+    } catch (error) {
+      console.error("Erro ao buscar endereço:", error);
+      toast.error("Não foi possível buscar o endereço da carteira.");
+    }
+  };
+
+  // Função para verificar saldo do usuário
+  const checkBalance = async (tokenAddress: string, ownerAddress: string): Promise<bigint> => {
+    const erc20ABI = [
+      {
+        "constant": true,
+        "inputs": [{"name":"_owner","type":"address"}],
+        "name": "balanceOf",
+        "outputs": [{"name":"balance","type":"uint256"}],
+        "type": "function"
+      }
+    ] as const;
+
+    return client.readContract({
+      address: tokenAddress as `0x${string}`,
+      abi: erc20ABI,
+      functionName: 'balanceOf',
+      args: [ownerAddress as `0x${string}`]
+    });
+  };
+
+  // Função para verificar o saldo de ETH do usuário
+  const checkGasBalance = async (): Promise<bigint> => {
+    if (!userAddress) return BigInt(0);
+    
+    try {
+      const balance = await client.getBalance({
+        address: userAddress as `0x${string}`
+      });
+      
+      console.log(`[DEBUG] Saldo de ETH: ${ethers.formatEther(balance)}`);
+      return balance;
+    } catch (error) {
+      console.error('[DEBUG] Erro ao verificar saldo de ETH:', error);
+      toast.error('Falha ao verificar saldo de rede');
+      return BigInt(0);
+    }
+  };
+
+  // Função principal para lidar com o swap usando Permit2
+  const handlePermit2Swap = async () => {
+    setLoading(true);
+    
+    try {
+      if (!userAddress) {
+        toast.error("Endereço do usuário não disponível. Por favor, conecte-se.");
+        setLoading(false);
+        return;
+      }
+
+      if (!MiniKit.isInstalled()) {
+        toast.error('World App não está instalada. Por favor, instale-a para continuar.');
+        setLoading(false);
+        return;
+      }
+
+      // Verificação de saldo do usuário
+      console.log('[DEBUG] Verificando saldo do usuário...');
+      let userBalance: bigint;
+      let amountInBigInt: bigint;
+      
+      try {
+        userBalance = await checkBalance(WLD_TOKEN, userAddress);
+        console.log(`[DEBUG] Saldo do usuário: ${userBalance.toString()} unidades base (wei)`);
+        
+        amountInBigInt = tokenToDecimals(Number(amount), Tokens.WLD);
+        console.log(`[DEBUG] Quantidade necessária: ${amountInBigInt.toString()} wei`);
+        
+        if (userBalance < amountInBigInt) {
+          toast.error(`Saldo insuficiente! Você possui ${ethers.formatUnits(userBalance, 18)} WLD, mas precisa de ${ethers.formatUnits(amountInBigInt, 18)} WLD.`);
+          setLoading(false);
+          return;
+        }
+      } catch (error) {
+        console.error('[DEBUG] Erro ao verificar saldo:', error);
+        toast.error('Não foi possível verificar o saldo da carteira');
+        setLoading(false);
+        return;
+      }
+
+      // Verificação do saldo de ETH para taxas de gás
+      console.log('[DEBUG] Verificando saldo de ETH para taxas...');
+      try {
+        const gasBalance = await checkGasBalance();
+        console.log(`[DEBUG] Saldo de ETH: ${ethers.formatEther(gasBalance)}`);
+        
+        // Verifica se tem saldo suficiente para taxas
+        if (gasBalance < MIN_GAS_BALANCE) {
+          toast.error(
+            `Saldo insuficiente para taxas de rede! Você precisa de pelo menos ${ethers.formatEther(MIN_GAS_BALANCE)} ETH.`,
+            { 
+              duration: 10000,
+              action: {
+                text: 'Obter ETH Grátis',
+                onClick: () => window.open(WORLDCHAIN_FAUCET_URL, '_blank')
+              }
+            }
+          );
+          setLoading(false);
+          return;
+        }
+      } catch (error) {
+        console.error('[DEBUG] Erro ao verificar saldo de ETH:', error);
+        toast.error('Não foi possível verificar o saldo de ETH para taxas.');
+        setLoading(false);
+        return;
+      }
+
+      // Verificação da existência do pool de liquidez
+      try {
+        console.log('[DEBUG] Verificando a existência do pool de liquidez...');
+        const factoryABI = [{"inputs":[],"name":"factory","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"}] as const;
+        const factoryAddress = await client.readContract({
+          address: UNISWAP_V2_ROUTER,
+          abi: factoryABI,
+          functionName: 'factory',
+        });
+        console.log(`[DEBUG] Endereço da Factory do roteador: ${factoryAddress}`);
+
+        const factoryV2ABI = [{"inputs":[{"internalType":"address","name":"tokenA","type":"address"},{"internalType":"address","name":"tokenB","type":"address"}],"name":"getPair","outputs":[{"internalType":"address","name":"pair","type":"address"}],"stateMutability":"view","type":"function"}] as const;
+        const pairAddress = await client.readContract({
+            address: factoryAddress as `0x${string}`,
+            abi: factoryV2ABI,
+            functionName: 'getPair',
+            args: [WLD_TOKEN as `0x${string}`, CR7_TOKEN as `0x${string}`]
+        });
+
+        if (pairAddress === '0x0000000000000000000000000000000000000000') {
+            toast.error('O swap não é possível. Não há liquidez para o par WLD/CR7.', { duration: 6000 });
+            console.error('[DEBUG] O par WLD/CR7 não existe no roteador Uniswap V2 fornecido. A função getPair retornou o endereço zero.');
+            setLoading(false);
+            return;
+        }
+        console.log(`[DEBUG] Pool de liquidez WLD/CR7 encontrado no endereço: ${pairAddress}`);
+      } catch (e) {
+        console.error('[DEBUG] Erro ao verificar o pool de liquidez. Verifique se o endereço do roteador está correto.', e);
+        toast.error('Não foi possível verificar a liquidez. O endereço do roteador pode ser inválido.');
+        setLoading(false);
+        return;
+      }
+
+      // Converte a quantidade do input para a menor unidade do token
+      amountInBigInt = tokenToDecimals(Number(amount), Tokens.WLD);
+      
+      // Define um prazo de validade de 30 minutos para a transação (em segundos)
+      const deadline = Math.floor(Date.now() / 1000) + 1800; // 30 minutos
+      
+      console.log('[DEBUG] Valores para a transação:');
+      console.log('amountIn (BigInt):', amountInBigInt.toString());
+      console.log('deadline (timestamp):', deadline);
+
+      // PASSO 1: Aprovar o Permit2 para gastar tokens WLD usando o método correto
+      console.log('[DEBUG] Aprovando Permit2 para gastar WLD via MiniKit.subscribe...');
+      
+      try {
+        // Usar o método nativo do MiniKit para permissões
+        await MiniKit.subscribe({
+          token: WLD_TOKEN,
+          amount: amountInBigInt.toString(),
+          spender: PERMIT2_ADDRESS
+        });
+        
+        console.log('[DEBUG] Aprovação via subscribe concluída com sucesso!');
+      } catch (error: any) {
+        console.error('[DEBUG] Erro na aprovação via subscribe:', error);
+        
+        if (error.code === 'USER_REJECTED') {
+          toast.error('Aprovação rejeitada pelo usuário.');
+        } else {
+          toast.error('Falha ao aprovar o gasto de WLD.');
+        }
+        
+        setLoading(false);
+        return;
+      }
+
+      // PASSO 2: Preparar e enviar a transação de swap
+      
+      // ABI para a função `swapExactTokensForTokens` do Uniswap V2
+      const uniswapABI: Abi = [
+        {
+          "inputs": [
+            {"internalType": "uint256", "name": "amountIn", "type": "uint256"},
+            {"internalType": "uint256", "name": "amountOutMin", "type": "uint256"},
+            {"internalType": "address[]", "name": "path", "type": "address[]"},
+            {"internalType": "address", "name": "to", "type": "address"},
+            {"internalType": "uint256", "name": "deadline", "type": "uint256"}
+          ],
+          "name": "swapExactTokensForTokens",
+          "outputs": [{"internalType": "uint256[]", "name": "amounts", "type": "uint256[]"}],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        }
+      ];
+
+      // Codifica os dados da chamada para a função de swap do Uniswap
+      const uniswapCallData = encodeFunctionData({
+        abi: uniswapABI,
+        functionName: 'swapExactTokensForTokens',
+        args: [
+          amountInBigInt,
+          BigInt(0), // amountOutMin: 0 para aceitar qualquer quantidade
+          [WLD_TOKEN, CR7_TOKEN], // O caminho do swap: WLD -> CR7
+          userAddress, // Destinatário dos tokens CR7
+          BigInt(deadline)
+        ]
+      });
+
+      console.log('[DEBUG] Uniswap call data (codificado):', uniswapCallData);
+
+      // ABI para a função `permitAndCall` do contrato Permit2
+      const permit2AdapterABI: Abi = [
+        {
+          "inputs": [
+            {"internalType": "address", "name": "token", "type": "address"},
+            {"internalType": "uint256", "name": "amount", "type": "uint256"},
+            {"internalType": "uint256", "name": "deadline", "type": "uint256"},
+            {"internalType": "bytes", "name": "signature", "type": "bytes"},
+            {"internalType": "address", "name": "spender", "type": "address"},
+            {"internalType": "bytes", "name": "callData", "type": "bytes"}
+          ],
+          "name": "permitAndCall",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        }
+      ] as const;
+
+      // Constrói a transação para o MiniKit
+      const transaction: Transaction = {
+        address: PERMIT2_ADDRESS,
+        abi: permit2AdapterABI,
+        functionName: 'permitAndCall',
+        args: [
+          WLD_TOKEN,
+          amountInBigInt,
+          BigInt(deadline),
+          "0x", // Assinatura vazia
+          UNISWAP_V2_ROUTER,
+          uniswapCallData
+        ]
+      };
+
+      // Monta o payload final para o MiniKit
+      const payload: SendTransactionInput = {
+        transaction: [transaction]
+      };
+
+      console.log('Enviando transação de swap via MiniKit...');
+      const response = await MiniKit.commandsAsync.sendTransaction(payload);
+
+      console.log('[DEBUG] Resposta completa do MiniKit:', response);
+
+      if (response.finalPayload.status === 'success') {
+        setTransactionId(response.finalPayload.transaction_id);
+        toast.success('Transação enviada com sucesso! Aguardando confirmação.');
+      } else {
+        const errorCode = response.finalPayload.error_code;
+        toast.error(`Erro: ${errorCode}`);
+        console.error('[DEBUG] Detalhes do erro do MiniKit:', response.finalPayload);
+        
+        // Se houver URL de debug, registra e mostra ao usuário
+        if (response.finalPayload.details?.debugUrl) {
+          console.error('[DEBUG] URL de depuração:', response.finalPayload.details.debugUrl);
+          toast.error(`Detalhes do erro: ${response.finalPayload.details.debugUrl}`);
+        }
+        
+        if (errorCode === 'simulation_failed') {
+          toast.error('A simulação falhou. Verifique os detalhes do erro.', { duration: 5000 });
+        }
+      }
+
+    } catch (error: any) {
+      console.error('[DEBUG] Erro no processo de swap:', error);
+      
+      // Tratamento específico para erros do MiniKit
+      if (error.finalPayload) {
+        const errorCode = error.finalPayload.error_code || 'unknown_error';
+        const debugUrl = error.finalPayload.details?.debugUrl;
+        
+        if (errorCode === 'simulation_failed') {
+          toast.error(`Falha na simulação: ${debugUrl ? `Detalhes: ${debugUrl}` : 'Verifique logs'}`);
+        } else {
+          toast.error(`Erro: ${errorCode} ${debugUrl ? `(Detalhes: ${debugUrl})` : ''}`);
+        }
+      } 
+      // Tratamento para erros de rejeição do usuário
+      else if (error.code === 'USER_REJECTED' || (error.info && error.info.error?.code === 4001)) {
+        toast.error('Transação rejeitada pelo usuário.');
+      } 
+      // Tratamento para saldo insuficiente
+      else if (error.message && error.message.toLowerCase().includes('insufficient funds')) {
+        toast.error('Saldo insuficiente para a transação.');
+      } 
+      // Tratamento genérico
+      else {
+        toast.error(`Ocorreu um erro: ${(error as Error).message || 'Desconhecido'}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-lg font-sans">
+      {userProfile && userAddress && (
+        <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center">
+            <div className="mr-4">
+              {userProfile.profilePictureUrl ? (
+                <img 
+                  src={userProfile.profilePictureUrl} 
+                  alt="Profile" 
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="bg-gray-200 border-2 border-dashed rounded-full w-12 h-12 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </div>
+              )}
+            </div>
+            <div>
+              <h2 className="font-bold text-lg text-gray-800">{userProfile.username}</h2>
+              <p className="text-sm text-gray-600 font-mono" title={userAddress}>
+                {userAddress.slice(0, 6)}...{userAddress.slice(-4)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <h1 className="text-2xl font-bold mb-4 text-center text-gray-900">Swap de WLD para CR7</h1>
+      
+      <div className="mb-4">
+        <label htmlFor="amount-input" className="block text-gray-700 mb-2 font-medium">
+          Quantidade de WLD a trocar:
+        </label>
+        <input
+          id="amount-input"
+          type="number"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          step="0.001"
+          min="0.001"
+        />
+      </div>
+
+      <button
+        onClick={handlePermit2Swap}
+        disabled={loading || isConfirming}
+        className="w-full py-3 px-4 rounded-md text-white font-semibold transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-blue-600 hover:bg-blue-700"
+      >
+        {loading ? 'Processando...' : isConfirming ? 'Confirmando...' : 'Fazer Swap com Permit2'}
+      </button>
+
+      <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <h2 className="text-lg font-semibold mb-2 text-gray-800">Status da Transação:</h2>
+        {transactionId ? (
+          <div className="space-y-2">
+            <div>
+              <span className="font-medium text-sm">ID da Transação:</span>
+              <p className="text-xs font-mono break-all text-gray-600">{transactionId}</p>
+            </div>
+            {isConfirming && <p className="text-yellow-600 animate-pulse">⌛ Confirmando na blockchain...</p>}
+            {isConfirmed && <p className="text-green-600 font-bold">✅ Sucesso! Swap concluído.</p>}
+            {transactionError && <p className="text-red-600">❌ Erro na confirmação: {transactionError.message}</p>}
+          </div>
+        ) : (
+          <p className="text-gray-500">Nenhuma transação foi iniciada ainda.</p>
+        )}
+      </div>
+    </div>
+  );
+}
