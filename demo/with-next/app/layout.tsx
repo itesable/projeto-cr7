@@ -3,7 +3,6 @@ import ClientProviders from '@/components/ClientProviders';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { MiniKitProvider } from '@/components/MiniKitProvider'; // <-- adicione aqui
 import { Providers } from './providers';
 
 const inter = Inter({ subsets: ['latin'] });
