@@ -577,8 +577,12 @@ export default function DashboardPage() {
 
                   <Button
                     onClick={handleTrade}
-                    disabled={!tradeAmount || loadingPrices || priceError || !pool}
-                    className={`w-full py-4 text-lg font-bold transition-all ${tradeType === "buy" ? "bg-green-600 hover:bg-green-700 shadow-green-500/25" : "bg-red-600 hover:bg-red-700 shadow-red-500/25"} text-white shadow-lg`}
+                    disabled={!tradeAmount || loadingPrices || Boolean(priceError) || !pool}
+                    className={`w-full py-4 text-lg font-bold transition-all ${
+                      tradeType === "buy"
+                        ? "bg-green-600 hover:bg-green-700 shadow-green-500/25"
+                        : "bg-red-600 hover:bg-red-700 shadow-red-500/25"
+                    } text-white shadow-lg`}
                   >
                     {loadingPrices || priceError
                       ? "Prices loading..."
