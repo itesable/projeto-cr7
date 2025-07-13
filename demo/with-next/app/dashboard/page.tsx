@@ -111,8 +111,8 @@ export default function DashboardPage() {
         toast.warning(`Endereço não encontrado para este username`);
       }
     } catch (error) {
-      console.error("Erro ao buscar endereço do usuário:", error);
-      toast.error("Falha ao buscar endereço do usuário");
+      console.error(`Erro ao buscar endereço do usuário:`, error);
+      toast.error(`Falha ao buscar endereço do usuário`);
     }
   };
 
@@ -125,10 +125,10 @@ export default function DashboardPage() {
       const payload = {
         jsonrpc: '2.0',
         id: 1,
-        method: "eth_call",
+        method: 'eth_call',
         params: [{
           to: tokenAddress,
-          data: "0x70a08231000000000000000000000000" + cleanAddress
+          data: '0x70a08231000000000000000000000000' + cleanAddress
         }, "latest"]
       };
 
@@ -205,7 +205,7 @@ export default function DashboardPage() {
       );
 
       if (!cr7WldPair) {
-        throw new Error("Par CR7/WLD não encontrado");
+        throw new Error(`Par CR7/WLD não encontrado`);
       }
 
       setPairData(cr7WldPair);
@@ -228,8 +228,8 @@ export default function DashboardPage() {
         });
       }
     } catch (error) {
-      console.error("Erro ao buscar dados do par:", error);
-      setPriceError("Falha ao carregar preços. Tentando novamente...");
+      console.error(`Erro ao buscar dados do par:`, error);
+      setPriceError(`Falha ao carregar preços. Tentando novamente...`);
       setTimeout(fetchPairData, 5000);
     } finally {
       setLoadingPrices(false);
@@ -290,7 +290,7 @@ export default function DashboardPage() {
     // Verificação do MiniKit antes de prosseguir
     try {
       if (!MiniKit.isInstalled()) {
-        toast.error("❌ MiniKit não está instalado no World App", {
+        toast.error(`❌ MiniKit não está instalado no World App`, {
           position: "top-center",
           autoClose: 5000,
           theme: "colored"
@@ -298,7 +298,7 @@ export default function DashboardPage() {
         return;
       }
 
-      toast.success("✅ MiniKit reconhecido! Preparando transação...", {
+      toast.success(`✅ MiniKit reconhecido! Preparando transação...`, {
         position: "top-center",
         autoClose: 3000,
         theme: "colored"
@@ -323,11 +323,11 @@ export default function DashboardPage() {
     if (userAddress && typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(userAddress);
       setAddressCopied(true);
-      toast.success("Endereço copiado!");
+      toast.success(`Endereço copiado!`);
       setTimeout(() => setAddressCopied(false), 2000);
     } else if (!userAddress && userProfile?.username) {
       fetchUserAddress(userProfile.username);
-      toast.info("Buscando endereço, tente novamente em instantes");
+      toast.info(`Buscando endereço, tente novamente em instantes`);
     }
   };
 
