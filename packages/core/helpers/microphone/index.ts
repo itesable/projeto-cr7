@@ -1,4 +1,4 @@
-import { sendWebviewEvent } from 'helpers/send-webview-event';
+import { sendWebviewEvent } from '../helpers/send-webview-event';
 import { MiniKit } from 'minikit';
 import { MicrophoneErrorCodes } from 'types/errors';
 import { ResponseEvent } from 'types/responses';
