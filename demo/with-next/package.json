@@ -59,6 +59,7 @@
     "prettier-plugin-sort-imports-desc": "^1.0.0",
     "react-day-picker": "^9.8.0",
     "react-dom": "^19.1.0",
+    "react-hook-form": "^7.60.0",
     "react-hot-toast": "^2.5.2",
     "react-toastify": "^11.0.5",
     "recharts": "^3.1.0",
