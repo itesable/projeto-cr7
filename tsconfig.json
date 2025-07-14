@@ -23,7 +23,9 @@
     "paths": {
       "@/*": [
         "."
-      ]
+      ],
+      "types/*": ["packages/core/types/*"],
+      "helpers/*": ["packages/core/helpers/*"]
     },
     "allowJs": true,
     "noEmit": true,
