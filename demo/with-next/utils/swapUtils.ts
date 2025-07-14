@@ -27,7 +27,7 @@ export const buyCR7 = async (provider: any, amountIn: string, userAddress: strin
     // Obter estimativa de saída
     const amountsOut = await routerContract.getAmountsOut(amountInWei, [WLD_TOKEN_ADDRESS, CR7_TOKEN_ADDRESS]);
     const expectedAmountOut = amountsOut[1];
-    const amountOutMin = expectedAmountOut.sub(expectedAmountOut.mul(ethers.parseUnit(slippage.toString(), 2)).div(100));
+    const amountOutMin = expectedAmountOut.sub(expectedAmountOut.mul(ethers.parseUnits(slippage.toString(), 2)).div(100));
 
     // Deadline 20 minutos
     const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
