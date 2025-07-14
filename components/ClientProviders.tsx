@@ -8,18 +8,6 @@ const ErudaProvider = dynamic(
   { ssr: false }
 );
 
-// Adicione esta importação dinâmica para o MiniKitProvider:
-const MiniKitProvider = dynamic(
-  () => 
-    import('@worldcoin/minikit-js').then((mod) => {
-      // Se houver problema com o nome, tentamos diferentes formas
-      return mod.MiniKitProvider || mod.default || mod;
-    }),
-  { 
-    ssr: false // Isso é ESSENCIAL!
-  }
-);
-
 interface ClientProvidersProps {
   children: ReactNode;
   session: any;
@@ -31,10 +19,8 @@ export default function ClientProviders({
 }: ClientProvidersProps) {
   return (
     <ErudaProvider>
-      {/* Isso agora vai funcionar apenas no navegador */}
-      <MiniKitProvider>
-        <SessionProvider session={session}>{children}</SessionProvider>
-      </MiniKitProvider>
+      {/* Removi completamente o MiniKitProvider */}
+      <SessionProvider session={session}>{children}</SessionProvider>
     </ErudaProvider>
   );
 }
