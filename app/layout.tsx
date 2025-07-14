@@ -1,5 +1,5 @@
-import { auth } from '@/auth';
-import ClientProviders from '@/components/ClientProviders';
+import { auth } from '../auth';
+import ClientProviders from '../components/ClientProviders';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';

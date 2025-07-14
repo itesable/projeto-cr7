@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
 import {
   Coins,
   Trophy,
@@ -18,7 +18,7 @@ import axios from "axios";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { MiniKit } from '@worldcoin/minikit-js';
-import ClaimButton from '@/components/ClaimButton';
+import ClaimButton from '../../components/ClaimButton';
 
 interface UserProfile {
   username: string | null;

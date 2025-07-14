@@ -1,6 +1,6 @@
 // app/api/supply/route.ts
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '../../../lib/db';
 
 export async function GET(request: NextRequest) {
   try {

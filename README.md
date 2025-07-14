@@ -1,31 +1,22 @@
-# minikit-js
+This is a demo application to try out minikit. Since this connects to the World App. You will need a corresponding test build of an android app to receive and send events.
 
-## 🚀 Getting Started
+## Getting Started
 
-MiniKit is currently available on npm. To install, run:
-`pnpm i @worldcoin/minikit-js`
+First, run the development server:
 
-or use the CDN:
-`https://cdn.jsdelivr.net/npm/@worldcoin/minikit-js@[version]/+esm`
-
-For comprehensive setup instructions and usage examples, visit our [developer documentation](https://docs.world.org/mini-apps).
-
-## 🛠 ️Developing Locally
-
-To run the example mini app locally:
-
-```
-pnpm i
-cd demo/with-next
+```bash
+npm run dev
+# or
+yarn dev
+# or
 pnpm dev
+# or
+bun dev
 ```
 
-This will launch a demo mini app with all essential commands implemented, allowing you to explore and test the features.
+### Usage
 
-## 📦 Releasing
-
-To bump the version of the package, run:
-
-```
-pnpm changeset
-```
+1. Recommended usage to test is to use the corresponding android folder, ask Andy for permission
+2. `pnpm dev`
+3. `ngrok 3000`
+4. Set the Ngrok url to the ngrok generated url
