@@ -1,4 +1,4 @@
-import { AppConfig } from 'src/types/client';
+import { AppConfig } from '../types/client';
 export interface TransactionStatus {
   transactionHash: `0x${string}`;
   transactionStatus: 'pending' | 'mined' | 'failed';
