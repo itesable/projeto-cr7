@@ -1,6 +1,6 @@
 // app/api/claim/route.ts
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '../../../lib/db';
 import { ethers } from 'ethers';
 
 const PRIVATE_KEY = process.env.WALLET_PRIVATE_KEY;
