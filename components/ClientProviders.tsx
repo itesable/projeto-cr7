@@ -1,18 +1,28 @@
 'use client';
-import { MiniKitProvider } from '@worldcoin/minikit-js';
 import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
-import SessionProvider from './SessionProvider'; // Assuming SessionProvider is also client-side or compatible
+import SessionProvider from './SessionProvider';
 
 const ErudaProvider = dynamic(
   () => import('./ClientContent/Eruda').then((c) => c.ErudaProvider),
-  { ssr: false },
+  { ssr: false }
 );
 
-// Define props for ClientProviders
+// Adicione esta importação dinâmica para o MiniKitProvider:
+const MiniKitProvider = dynamic(
+  () => 
+    import('@worldcoin/minikit-js').then((mod) => {
+      // Se houver problema com o nome, tentamos diferentes formas
+      return mod.MiniKitProvider || mod.default || mod;
+    }),
+  { 
+    ssr: false // Isso é ESSENCIAL!
+  }
+);
+
 interface ClientProvidersProps {
   children: ReactNode;
-  session: any; // Use the appropriate type for session from next-auth
+  session: any;
 }
 
 export default function ClientProviders({
@@ -21,6 +31,7 @@ export default function ClientProviders({
 }: ClientProvidersProps) {
   return (
     <ErudaProvider>
+      {/* Isso agora vai funcionar apenas no navegador */}
       <MiniKitProvider>
         <SessionProvider session={session}>{children}</SessionProvider>
       </MiniKitProvider>
