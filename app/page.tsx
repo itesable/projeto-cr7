@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "../components/ui/card"
+import { Button } from "../components/ui/button"
 import {
   ChevronDown,
   ChevronUp,
@@ -16,10 +16,10 @@ import {
   FileText,
   CheckCircle,
 } from "lucide-react"
-import Home from "../home"
+//import Home from "../home"
 //import { useAuthHandler } from '../components/AuthButton'
 import { MiniKit } from "@worldcoin/minikit-js"
-import { ClientContent } from '@/components/ClientContent';
+import { ClientContent } from '../components/ClientContent';
 
 export default function CR7WhitepaperApp() {
   const [activeSection, setActiveSection] = useState<"login" | "whitepaper" | "dashboard">("whitepaper")
