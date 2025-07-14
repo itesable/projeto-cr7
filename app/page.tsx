@@ -16,7 +16,7 @@ import {
   FileText,
   CheckCircle,
 } from "lucide-react"
-//import Home from "../home"
+import Home from "../home"
 //import { useAuthHandler } from '../components/AuthButton'
 import { MiniKit } from "@worldcoin/minikit-js"
 import { ClientContent } from '../components/ClientContent';
