@@ -1,4 +1,4 @@
-import { ethers } from 'ethers';
+import { ethers, parseUnits } from 'ethers';
 
 // Endereços dos contratos
 const UNISWAP_V2_ROUTER_ADDRESS = '0x541aB7c31A119441eF3575F6973277DE0eF460bd';
@@ -19,7 +19,7 @@ export const buyCR7 = async (provider: any, amountIn: string, userAddress: strin
     const routerContract = new ethers.Contract(UNISWAP_V2_ROUTER_ADDRESS, UNISWAP_V2_ROUTER_ABI, signer);
 
     // Converter para wei (WLD tem 18 decimais)
-    const amountInWei = ethers.utils.parseUnits(amountIn, 18);
+    const amountInWei = ethers.parseUnits(amountIn, 18);
     
     // 1% de slippage
     const slippage = 0.01;
@@ -27,7 +27,7 @@ export const buyCR7 = async (provider: any, amountIn: string, userAddress: strin
     // Obter estimativa de saída
     const amountsOut = await routerContract.getAmountsOut(amountInWei, [WLD_TOKEN_ADDRESS, CR7_TOKEN_ADDRESS]);
     const expectedAmountOut = amountsOut[1];
-    const amountOutMin = expectedAmountOut.sub(expectedAmountOut.mul(ethers.utils.parseUnits(slippage.toString(), 2)).div(100));
+    const amountOutMin = expectedAmountOut.sub(expectedAmountOut.mul(ethers.parseUnit(slippage.toString(), 2)).div(100));
 
     // Deadline 20 minutos
     const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
