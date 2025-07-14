@@ -25,7 +25,8 @@
         "."
       ],
       "types/*": ["packages/core/types/*"],
-      "helpers/*": ["packages/core/helpers/*"]
+      "helpers/*": ["packages/core/helpers/*"],
+      "minikit": ["packages/core/minikit.ts"]
     },
     "allowJs": true,
     "noEmit": true,
